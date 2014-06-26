@@ -53,7 +53,6 @@
 
 @global CPApp
 
-
 @protocol CPWindowDelegate <CPObject>
 
 @optional
@@ -1131,7 +1130,7 @@ CPTexturedBackgroundWindowMask
 */
 - (void)setContentView:(CPView)aView
 {
-    if (_contentView)
+    if (_contentView && _contentView !== aView)
         [_contentView removeFromSuperview];
 
     var bounds = CGRectMake(0.0, 0.0, CGRectGetWidth(_frame), CGRectGetHeight(_frame));
@@ -1792,9 +1791,13 @@ CPTexturedBackgroundWindowMask
                     // even that we just moved it to a new first responder.
                     [[[anEvent window] platformWindow] _propagateCurrentDOMEvent:NO]
 #endif
-                }
 
+                }
                 return didTabBack;
+            }
+            else if ([anEvent charactersIgnoringModifiers] === CPEscapeFunctionKey && [self _shouldCloseOnEscape])
+            {
+                return;
             }
 
             [[self firstResponder] keyDown:anEvent];
@@ -3031,6 +3034,14 @@ CPTexturedBackgroundWindowMask
         [[self firstResponder] doCommandBySelector:@selector(complete:)];
     }
 
+    return NO;
+}
+
+/*!
+    @ignore
+*/
+- (BOOL)_shouldCloseOnEscape
+{
     return NO;
 }
 
