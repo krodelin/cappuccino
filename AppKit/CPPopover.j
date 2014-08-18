@@ -246,9 +246,7 @@ Set the behavior of the CPPopover. It can be:
     if (!_popoverWindow)
         _popoverWindow = [[_CPPopoverWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:[self _styleMaskForBehavior]];
 
-    if (_positioningView != positioningView)
-        [_popoverWindow setPlatformWindow:[[positioningView window] platformWindow]];
-
+    [_popoverWindow setPlatformWindow:[[positioningView window] platformWindow]];
     [_popoverWindow setAppearance:_appearance];
     [_popoverWindow setAnimates:_animates];
     [_popoverWindow setDelegate:self];
@@ -262,7 +260,7 @@ Set the behavior of the CPPopover. It can be:
     [_popoverWindow positionRelativeToRect:positioningRect ofView:positioningView preferredEdge:preferredEdge];
 
     if (![self isShown])
-        [self _popoverDidShow];
+        [self _popoverWindowDidShow];
 }
 
 - (unsigned)_styleMaskForBehavior
