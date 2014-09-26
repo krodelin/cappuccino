@@ -834,6 +834,26 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
     }
 }
 
+- (void)_removeObservers
+{
+    if (!_isObserving)
+        return;
+
+    [super _removeObservers];
+    [self _setObserveWindowKeyNotifications:NO];
+}
+
+- (void)_addObservers
+{
+    if (_isObserving)
+        return;
+
+    [super _addObservers];
+
+    if ([self window] === self)
+        [self _setObserveWindowKeyNotifications:YES];
+}
+
 - (void)_windowDidResignKey:(CPNotification)aNotification
 {
     if (![[self window] isKeyWindow])
@@ -981,6 +1001,9 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 
 - (void)keyDown:(CPEvent)anEvent
 {
+    if (!([self isEnabled] && [self isEditable]))
+        return;
+
     // CPTextField uses an HTML input element to take the input so we need to
     // propagate the dom event so the element is updated. This has to be done
     // before interpretKeyEvents: though so individual commands have a chance

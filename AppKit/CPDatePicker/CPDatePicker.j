@@ -75,6 +75,7 @@ CPEraDatePickerElementFlag              = 0x0100;
     CPInteger       _datePickerStyle    @accessors(property=datePickerStyle);
     CPInteger       _timeInterval       @accessors(property=timeInterval);
 
+    BOOL                    _invokedByUserEvent;
     _CPDatePickerTextField  _datePickerTextfield;
     _CPDatePickerCalendar   _datePickerCalendar;
     unsigned                _implementedCDatePickerDelegateMethods;
@@ -206,14 +207,10 @@ CPEraDatePickerElementFlag              = 0x0100;
         _locale = [CPLocale currentLocale];
 
     _datePickerTextfield = [[_CPDatePickerTextField alloc] initWithFrame:[self bounds] withDatePicker:self];
-
     [_datePickerTextfield setDateValue:_dateValue];
-    [self addSubview:_datePickerTextfield];
 
     _datePickerCalendar = [[_CPDatePickerCalendar alloc] initWithFrame:[self bounds] withDatePicker:self];
     [_datePickerCalendar setDateValue:_dateValue];
-    [_datePickerCalendar setHidden:YES];
-    [self addSubview:_datePickerCalendar];
 
     // We might have been unarchived in a disabled state.
     [_datePickerTextfield setEnabled:[self isEnabled]];
@@ -259,21 +256,30 @@ CPEraDatePickerElementFlag              = 0x0100;
 */
 - (void)layoutSubviews
 {
-
     [super layoutSubviews];
 
     if (_datePickerStyle == CPTextFieldAndStepperDatePickerStyle || _datePickerStyle == CPTextFieldDatePickerStyle)
     {
-        [_datePickerTextfield setHidden:NO];
-        [_datePickerCalendar setHidden:YES];
+        if (![_datePickerTextfield superview])
+            [self addSubview:_datePickerTextfield];
+
+        if ([_datePickerCalendar superview])
+            [_datePickerCalendar removeFromSuperview];
+
         [_datePickerTextfield setControlSize:[self controlSize]];
         [_datePickerTextfield setNeedsLayout];
+        [_datePickerTextfield setNeedsDisplay:YES];
     }
     else
     {
-        [_datePickerCalendar setHidden:NO];
-        [_datePickerTextfield setHidden:YES];
+        if (![_datePickerCalendar superview])
+            [self addSubview:_datePickerCalendar];
+
+        if ([_datePickerTextfield superview])
+            [_datePickerTextfield removeFromSuperview];
+
         [_datePickerCalendar setNeedsLayout];
+        [_datePickerCalendar setNeedsDisplay:YES];
     }
 }
 
@@ -307,6 +313,7 @@ CPEraDatePickerElementFlag              = 0x0100;
     if (aDateValue == nil)
         return;
 
+    _invokedByUserEvent = NO;
     [self _setDateValue:aDateValue timeInterval:_timeInterval];
 }
 
@@ -354,7 +361,8 @@ CPEraDatePickerElementFlag              = 0x0100;
     _timeInterval = (_datePickerMode == CPSingleDateMode)? 0 : aTimeInterval;
     [self didChangeValueForKey:@"timeInterval"];
 
-    [self sendAction:[self action] to:[self target]];
+    if (_invokedByUserEvent)
+        [self sendAction:[self action] to:[self target]];
 
     if (_datePickerStyle == CPTextFieldAndStepperDatePickerStyle || _datePickerStyle == CPTextFieldDatePickerStyle)
         [_datePickerTextfield setDateValue:_dateValue];
