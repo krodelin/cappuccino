@@ -35,6 +35,7 @@
 var exposedBindingsMap = @{},
     bindingsMap = @{};
 
+@typedef CPBindingOperationKind
 var CPBindingOperationAnd = 0,
     CPBindingOperationOr  = 1;
 
@@ -156,7 +157,7 @@ var CPBindingOperationAnd = 0,
 
         [self _updatePlaceholdersWithOptions:options forBinding:aName];
 
-        [aDestination addObserver:self forKeyPath:aKeyPath options:CPKeyValueObservingOptionNew context:aBinding];
+        [aDestination addObserver:self forKeyPath:aKeyPath options:0 context:aBinding];
 
         var bindings = [bindingsMap objectForKey:[_source UID]];
 
