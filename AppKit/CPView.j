@@ -175,6 +175,7 @@ var CPViewFlags                     = { },
     BOOL                _postsBoundsChangedNotifications;
     BOOL                _inhibitFrameAndBoundsChangedNotifications;
     BOOL                _inLiveResize;
+    BOOL                _isSuperviewAClipView;
 
 #if PLATFORM(DOM)
     DOMElement          _DOMElement;
@@ -824,6 +825,8 @@ var CPViewFlags                     = { },
 */
 - (void)viewWillMoveToSuperview:(CPView)aView
 {
+    _isSuperviewAClipView = [aView isKindOfClass:[CPClipView class]];
+
     [self _removeObservers];
 
     if (aView)
@@ -955,6 +958,9 @@ var CPViewFlags                     = { },
 
     if (_postsFrameChangedNotifications)
         [CachedNotificationCenter postNotificationName:CPViewFrameDidChangeNotification object:self];
+
+    if (_isSuperviewAClipView)
+        [[self superview] viewFrameChanged:[[CPNotification alloc] initWithName:CPViewFrameDidChangeNotification object:self userInfo:nil]];
 }
 
 /*!
@@ -1016,6 +1022,9 @@ var CPViewFlags                     = { },
 
     if (_postsFrameChangedNotifications && !_inhibitFrameAndBoundsChangedNotifications)
         [CachedNotificationCenter postNotificationName:CPViewFrameDidChangeNotification object:self];
+
+    if (_isSuperviewAClipView && !_inhibitFrameAndBoundsChangedNotifications)
+        [[self superview] viewFrameChanged:[[CPNotification alloc] initWithName:CPViewFrameDidChangeNotification object:self userInfo:nil]];
 
 #if PLATFORM(DOM)
     var transform = _superview ? _superview._boundsTransform : NULL;
@@ -1086,7 +1095,7 @@ var CPViewFlags                     = { },
                 // Make sure to repeat the top and bottom pieces horizontally if they're not the exact width needed.
                 if (top)
                 {
-                    CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", top + "px");
+                    CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", top + "px");
                     CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], size.width, top);
                     partIndex++;
                 }
@@ -1094,13 +1103,13 @@ var CPViewFlags                     = { },
                 {
                     var height = frameSize.height - top - bottom;
 
-                    CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", height + "px");
+                    CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", height + "px");
                     CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], size.width, size.height - top - bottom);
                     partIndex++;
                 }
                 if (bottom)
                 {
-                    CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", bottom + "px");
+                    CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", bottom + "px");
                     CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], size.width, bottom);
                 }
             }
@@ -1112,7 +1121,7 @@ var CPViewFlags                     = { },
                 // Make sure to repeat the left and right pieces vertically if they're not the exact height needed.
                 if (left)
                 {
-                    CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], left + "px", frameSize.height + "px");
+                    CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], left + "px", frameSize.height + "px");
                     CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], left, size.height);
                     partIndex++;
                 }
@@ -1120,13 +1129,13 @@ var CPViewFlags                     = { },
                 {
                     var width = (frameSize.width - left - right);
 
-                    CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], width + "px", frameSize.height + "px");
+                    CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], width + "px", frameSize.height + "px");
                     CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], size.width - left - right, size.height);
                     partIndex++;
                 }
                 if (right)
                 {
-                    CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], right + "px", frameSize.height + "px");
+                    CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], right + "px", frameSize.height + "px");
                     CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], right, size.height);
                 }
             }
@@ -1176,6 +1185,9 @@ var CPViewFlags                     = { },
 
     if (_postsFrameChangedNotifications && !_inhibitFrameAndBoundsChangedNotifications)
         [CachedNotificationCenter postNotificationName:CPViewFrameDidChangeNotification object:self];
+
+    if (_isSuperviewAClipView && !_inhibitFrameAndBoundsChangedNotifications)
+        [[self superview] viewFrameChanged:[[CPNotification alloc] initWithName:CPViewFrameDidChangeNotification object:self userInfo:nil]];
 }
 
 /*!
@@ -1210,6 +1222,9 @@ var CPViewFlags                     = { },
 
     if (_postsBoundsChangedNotifications)
         [CachedNotificationCenter postNotificationName:CPViewBoundsDidChangeNotification object:self];
+
+    if (_isSuperviewAClipView)
+        [[self superview] viewBoundsChanged:[[CPNotification alloc] initWithName:CPViewBoundsDidChangeNotification object:self userInfo:nil]];
 }
 
 /*!
@@ -1272,6 +1287,9 @@ var CPViewFlags                     = { },
 
     if (_postsBoundsChangedNotifications && !_inhibitFrameAndBoundsChangedNotifications)
         [CachedNotificationCenter postNotificationName:CPViewBoundsDidChangeNotification object:self];
+
+    if (_isSuperviewAClipView && !_inhibitFrameAndBoundsChangedNotifications)
+        [[self superview] viewBoundsChanged:[[CPNotification alloc] initWithName:CPViewBoundsDidChangeNotification object:self userInfo:nil]];
 }
 
 /*!
@@ -1310,6 +1328,9 @@ var CPViewFlags                     = { },
 
     if (_postsBoundsChangedNotifications && !_inhibitFrameAndBoundsChangedNotifications)
         [CachedNotificationCenter postNotificationName:CPViewBoundsDidChangeNotification object:self];
+
+    if (_isSuperviewAClipView && !_inhibitFrameAndBoundsChangedNotifications)
+        [[self superview] viewBoundsChanged:[[CPNotification alloc] initWithName:CPViewBoundsDidChangeNotification object:self userInfo:nil]];
 }
 
 
@@ -1868,7 +1889,7 @@ var CPViewFlags                     = { },
             _DOMImageParts[0].style.background = [_backgroundColor cssString];
 
             if (patternImage)
-                CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[0], [patternImage size].width + "px", [patternImage size].height + "px");
+                CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[0], [patternImage size].width + "px", [patternImage size].height + "px");
 
             if (CPFeatureIsCompatible(CPOpacityRequiresFilterFeature))
                 _DOMImageParts[0].style.filter = "alpha(opacity=" + [_backgroundColor alphaComponent] * 100 + ")";
@@ -1882,7 +1903,7 @@ var CPViewFlags                     = { },
             _DOMElement.style.background = colorCSS;
 
             if (patternImage)
-                CPDomDisplayServerSetStyleBackgroundSize(_DOMElement, [patternImage size].width + "px", [patternImage size].height + "px");
+                CPDOMDisplayServerSetStyleBackgroundSize(_DOMElement, [patternImage size].width + "px", [patternImage size].height + "px");
     }
     else
     {
@@ -1987,7 +2008,7 @@ var CPViewFlags                     = { },
             // Make sure to repeat the top and bottom pieces horizontally if they're not the exact width needed.
             if (top)
             {
-                CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", top + "px");
+                CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", top + "px");
                 CPDOMDisplayServerSetStyleLeftTop(_DOMImageParts[partIndex], NULL, 0.0, 0.0);
                 CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], frameSize.width, top);
                 partIndex++;
@@ -1997,14 +2018,14 @@ var CPViewFlags                     = { },
                 var height = frameSize.height - top - bottom;
 
                 //_DOMImageParts[partIndex].style.backgroundSize =  frameSize.width + "px " + height + "px";
-                CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", height + "px");
+                CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", height + "px");
                 CPDOMDisplayServerSetStyleLeftTop(_DOMImageParts[partIndex], NULL, 0.0, top);
                 CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], frameSize.width, height);
                 partIndex++;
             }
             if (bottom)
             {
-                CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", bottom + "px");
+                CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], frameSize.width + "px", bottom + "px");
                 CPDOMDisplayServerSetStyleLeftBottom(_DOMImageParts[partIndex], NULL, 0.0, 0.0);
                 CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], frameSize.width, bottom);
             }
@@ -2019,7 +2040,7 @@ var CPViewFlags                     = { },
             // Make sure to repeat the left and right pieces vertically if they're not the exact height needed.
             if (left)
             {
-                CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], left + "px", frameSize.height + "px");
+                CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], left + "px", frameSize.height + "px");
                 CPDOMDisplayServerSetStyleLeftTop(_DOMImageParts[partIndex], NULL, 0.0, 0.0);
                 CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], left, frameSize.height);
                 partIndex++;
@@ -2028,14 +2049,14 @@ var CPViewFlags                     = { },
             {
                 var width = (frameSize.width - left - right);
 
-                CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], width + "px", frameSize.height + "px");
+                CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], width + "px", frameSize.height + "px");
                 CPDOMDisplayServerSetStyleLeftTop(_DOMImageParts[partIndex], NULL, left, 0.0);
                 CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], width, frameSize.height);
                 partIndex++;
             }
             if (right)
             {
-                CPDomDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], right + "px", frameSize.height + "px");
+                CPDOMDisplayServerSetStyleBackgroundSize(_DOMImageParts[partIndex], right + "px", frameSize.height + "px");
                 CPDOMDisplayServerSetStyleRightTop(_DOMImageParts[partIndex], NULL, 0.0, 0.0);
                 CPDOMDisplayServerSetStyleSize(_DOMImageParts[partIndex], right, frameSize.height);
             }
