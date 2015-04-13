@@ -63,14 +63,18 @@
 
 @optional
 - (BOOL)windowShouldClose:(CPWindow)aWindow;
+- (CPSize)windowWillResize:(CPWindow)sender toSize:(CPSize)aSize;
 - (CPUndoManager)windowWillReturnUndoManager:(CPWindow)window;
 - (void)windowDidBecomeKey:(CPNotification)aNotification;
 - (void)windowDidBecomeMain:(CPNotification)aNotification;
+- (void)windowDidDeminiaturize:(CPNotification)notification;
 - (void)windowDidEndSheet:(CPNotification)aNotification;
+- (void)windowDidMiniaturize:(CPNotification)notification;
 - (void)windowDidMove:(CPNotification)aNotification;
 - (void)windowDidResignKey:(CPNotification)aNotification;
 - (void)windowDidResignMain:(CPNotification)aNotification;
 - (void)windowDidResize:(CPNotification)aNotification;
+- (void)windowWillMiniaturize:(CPNotification)notification;
 - (void)windowWillBeginSheet:(CPNotification)aNotification;
 - (void)windowWillClose:(CPWindow)aWindow;
 
@@ -78,7 +82,9 @@
 
 var CPWindowDelegate_windowShouldClose_             = 1 << 1
     CPWindowDelegate_windowWillReturnUndoManager_   = 1 << 2,
-    CPWindowDelegate_windowWillClose_               = 1 << 3;
+    CPWindowDelegate_windowWillClose_               = 1 << 3,
+    CPWindowDelegate_windowWillResize_toSize_       = 1 << 4;
+
 
 var CPWindowSaveImage       = nil,
 
@@ -575,6 +581,9 @@ CPTexturedBackgroundWindowMask
         var fullPlatformWindowViewClass = [[self class] _windowViewClassForFullPlatformWindowStyleMask:_styleMask],
             windowView = [[fullPlatformWindowViewClass alloc] initWithFrame:CGRectMakeZero() styleMask:_styleMask];
 
+        if (_platformWindow != [CPPlatformWindow primaryPlatformWindow] && [_platformWindow _hasInitializeInstanceWithWindow])
+            [_platformWindow setContentRect:[self frame]];
+
         [self _setWindowView:windowView];
 
         [self setLevel:CPBackgroundWindowLevel];
@@ -744,6 +753,9 @@ CPTexturedBackgroundWindowMask
             size.width = newSize.width;
             size.height = newSize.height;
 
+            if (!_isAnimating)
+                size = [self _sendDelegateWindowWillResizeToSize:size];
+
             [_windowView setFrameSize:size];
 
             if (_hasShadow)
@@ -759,6 +771,9 @@ CPTexturedBackgroundWindowMask
         if (originMoved)
             [self _moveChildWindows:delta];
     }
+
+    if ([_platformWindow _canUpdateContentRect] && _isFullPlatformWindow && _platformWindow != [CPPlatformWindow primaryPlatformWindow])
+        [_platformWindow setContentRect:aFrame];
 }
 
 /*
@@ -909,6 +924,10 @@ CPTexturedBackgroundWindowMask
 {
 
 #if PLATFORM(DOM)
+
+    if (!_isVisible)
+        [_platformWindow _setShouldUpdateContentRect:NO];
+
     // -dw- if a sheet is clicked, the parent window should come up too
     if (_isSheet)
         [_parentView orderFront:self];
@@ -932,6 +951,8 @@ CPTexturedBackgroundWindowMask
 
     if (!CPApp._mainWindow)
         [self makeMainWindow];
+
+    [_platformWindow _setShouldUpdateContentRect:YES];
 }
 
 /*
@@ -947,6 +968,11 @@ CPTexturedBackgroundWindowMask
 */
 - (void)_windowWillBeAddedToTheDOM
 {
+    [[CPNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(_didReceivePlatformWindowWillCloseNotification:)
+                                                 name:_CPPlatformWindowWillCloseNotification
+                                               object:_platformWindow];
+
     [[self contentView] _addObservers];
 }
 
@@ -955,7 +981,10 @@ CPTexturedBackgroundWindowMask
 */
 - (void)_windowWillBeRemovedFromTheDOM
 {
+    [[CPNotificationCenter defaultCenter] removeObserver:self name:_CPPlatformWindowWillCloseNotification object:nil];
+
     [[self contentView] _removeObservers];
+    _hasBecomeKeyWindow = NO;
 }
 
 
@@ -1000,6 +1029,9 @@ CPTexturedBackgroundWindowMask
 
 #if PLATFORM(DOM)
     if ([self _sharesChromeWithPlatformWindow])
+        [_platformWindow orderOut:self];
+
+    if (_isFullPlatformWindow && _platformWindow != [CPPlatformWindow primaryPlatformWindow])
         [_platformWindow orderOut:self];
 
     [_platformWindow order:CPWindowOut window:self relativeTo:nil];
@@ -1407,6 +1439,9 @@ CPTexturedBackgroundWindowMask
     [defaultCenter removeObserver:_delegate name:CPWindowDidResizeNotification object:self];
     [defaultCenter removeObserver:_delegate name:CPWindowWillBeginSheetNotification object:self];
     [defaultCenter removeObserver:_delegate name:CPWindowDidEndSheetNotification object:self];
+    [defaultCenter removeObserver:_delegate name:CPWindowDidMiniaturizeNotification object:self];
+    [defaultCenter removeObserver:_delegate name:CPWindowDidDeminiaturizeNotification object:self];
+    [defaultCenter removeObserver:_delegate name:CPWindowWillMiniaturizeNotification object:self];
 
     _delegate = aDelegate;
     _implementedDelegateMethods = 0;
@@ -1419,6 +1454,9 @@ CPTexturedBackgroundWindowMask
 
     if ([_delegate respondsToSelector:@selector(windowWillClose:)])
         _implementedDelegateMethods |= CPWindowDelegate_windowWillClose_;
+
+    if ([_delegate respondsToSelector:@selector(windowWillResize:toSize:)])
+        _implementedDelegateMethods |= CPWindowDelegate_windowWillResize_toSize_;
 
     if ([_delegate respondsToSelector:@selector(windowDidResignKey:)])
         [defaultCenter
@@ -1474,6 +1512,27 @@ CPTexturedBackgroundWindowMask
             addObserver:_delegate
                selector:@selector(windowDidEndSheet:)
                    name:CPWindowDidEndSheetNotification
+                 object:self];
+
+    if ([_delegate respondsToSelector:@selector(windowDidMiniaturize:)])
+        [defaultCenter
+            addObserver:_delegate
+               selector:@selector(windowDidMiniaturize:)
+                   name:CPWindowDidMiniaturizeNotification
+                 object:self];
+
+    if ([_delegate respondsToSelector:@selector(windowWillMiniaturize:)])
+        [defaultCenter
+            addObserver:_delegate
+               selector:@selector(windowWillMiniaturize:)
+                   name:CPWindowWillMiniaturizeNotification
+                 object:self];
+
+    if ([_delegate respondsToSelector:@selector(windowDidDeminiaturize:)])
+        [defaultCenter
+            addObserver:_delegate
+               selector:@selector(windowDidDeminiaturize:)
+                   name:CPWindowDidDeminiaturizeNotification
                  object:self];
 }
 
@@ -1787,6 +1846,9 @@ CPTexturedBackgroundWindowMask
 
     switch (type)
     {
+        case CPAppKitDefined:
+            return [CPApp activateIgnoringOtherApps:YES];
+
         case CPFlagsChanged:
             return [[self firstResponder] flagsChanged:anEvent];
 
@@ -2001,6 +2063,7 @@ CPTexturedBackgroundWindowMask
 
     [self _setupFirstResponder];
     _hasBecomeKeyWindow = YES;
+    _platformWindow._currentKeyWindow = self;
 
     [_windowView noteKeyWindowStateChanged];
     [_contentView _notifyWindowDidBecomeKey];
@@ -2071,6 +2134,7 @@ CPTexturedBackgroundWindowMask
     if (CPApp._keyWindow === self)
         CPApp._keyWindow = nil;
 
+    _platformWindow._currentKeyWindow = nil;
     [_windowView noteKeyWindowStateChanged];
     [_contentView _notifyWindowDidResignKey];
 
@@ -2454,6 +2518,7 @@ CPTexturedBackgroundWindowMask
 - (void)becomeMainWindow
 {
     CPApp._mainWindow = self;
+    _platformWindow._currentMainWindow = self;
 
     [self _synchronizeSaveMenuWithDocumentSaving];
 
@@ -2476,6 +2541,7 @@ CPTexturedBackgroundWindowMask
     if (CPApp._mainWindow === self)
         CPApp._mainWindow = nil;
 
+    _platformWindow._currentMainWindow = nil;
     [_windowView noteMainWindowStateChanged];
 }
 
@@ -3353,6 +3419,14 @@ CPTexturedBackgroundWindowMask
         [super setValue:aValue forKey:aKey];
 }
 
+- (void)_didReceivePlatformWindowWillCloseNotification:(CPNotification)aNotification
+{
+    if ([aNotification object] != _platformWindow)
+        return;
+
+    [self close];
+}
+
 @end
 
 var keyViewComparator = function(lhs, rhs, context)
@@ -3441,6 +3515,18 @@ var keyViewComparator = function(lhs, rhs, context)
         return;
 
     [_delegate windowWillClose:self];
+}
+
+/*!
+    @ignore
+    Call the delegate windowWillResize:toSize:
+*/
+- (CPSize)_sendDelegateWindowWillResizeToSize:(CPSize)aSize
+{
+    if (!(_implementedDelegateMethods & CPWindowDelegate_windowWillResize_toSize_))
+        return aSize;
+
+    return [_delegate windowWillResize:self toSize:aSize];
 }
 
 @end

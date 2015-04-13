@@ -312,13 +312,6 @@ var CPViewHighDPIDrawingEnabled = YES;
     _viewClassFlags = CPViewFlags[classUID];
 }
 
-- (void)_setupToolTipHandlers
-{
-    _toolTipInstalled = NO;
-    _toolTipFunctionIn = function(e) { [_CPToolTip scheduleToolTipForView:self]; }
-    _toolTipFunctionOut = function(e) { [_CPToolTip invalidateCurrentToolTipIfNeeded]; };
-}
-
 + (CPSet)keyPathsForValuesAffectingFrame
 {
     return [CPSet setWithObjects:@"frameOrigin", @"frameSize"];
@@ -387,7 +380,6 @@ var CPViewHighDPIDrawingEnabled = YES;
         _DOMImageSizes = [];
 #endif
 
-        [self _setupToolTipHandlers];
         [self _setupViewFlags];
 
         [self _loadThemeAttributes];
@@ -412,12 +404,16 @@ var CPViewHighDPIDrawingEnabled = YES;
 
     _toolTip = aToolTip;
 
-    if (_toolTip)
+    [self _manageToolTipInstallation];
+}
+
+- (void)_manageToolTipInstallation
+{
+    if ([self window] && _toolTip)
         [self _installToolTipEventHandlers];
     else
         [self _uninstallToolTipEventHandlers];
 }
-
 /*! @ignore
 
     Install the handlers for the tooltip
@@ -426,6 +422,12 @@ var CPViewHighDPIDrawingEnabled = YES;
 {
     if (_toolTipInstalled)
         return;
+
+    if (!_toolTipFunctionIn)
+        _toolTipFunctionIn = function(e) { [_CPToolTip scheduleToolTipForView:self]; }
+
+    if (!_toolTipFunctionOut)
+        _toolTipFunctionOut = function(e) { [_CPToolTip invalidateCurrentToolTipIfNeeded]; };
 
 #if PLATFORM(DOM)
     if (_DOMElement.addEventListener)
@@ -468,6 +470,9 @@ var CPViewHighDPIDrawingEnabled = YES;
         _DOMElement.detachEvent("onmouseout", _toolTipFunctionOut);
     }
 #endif
+
+    _toolTipFunctionIn = nil;
+    _toolTipFunctionOut = nil;
 
     _toolTipInstalled = NO;
 }
@@ -807,6 +812,8 @@ var CPViewHighDPIDrawingEnabled = YES;
 
     [self viewDidMoveToWindow];
 
+    [self _manageToolTipInstallation];
+
     [[self window] _dirtyKeyViewLoop];
 }
 
@@ -834,6 +841,7 @@ var CPViewHighDPIDrawingEnabled = YES;
 {
 //    if (_graphicsContext)
         [self setNeedsDisplay:YES];
+
 }
 
 /*!
@@ -2723,18 +2731,47 @@ setBoundsOrigin:
     if (CGRectContainsRect(documentViewVisibleRect, rectInDocumentView))
         return NO;
 
-    var scrollPoint = CGPointMakeCopy(documentViewVisibleRect.origin);
+    var currentScrollPoint = documentViewVisibleRect.origin,
+        scrollPoint = CGPointMakeCopy(currentScrollPoint),
+        rectInDocumentViewMinX = CGRectGetMinX(rectInDocumentView),
+        documentViewVisibleRectMinX = CGRectGetMinX(documentViewVisibleRect),
+        doesItFitForWidth = documentViewVisibleRect.size.width >= rectInDocumentView.size.width;
 
     // One of the following has to be true since our current visible rect didn't contain aRect.
-    if (CGRectGetMinX(rectInDocumentView) < CGRectGetMinX(documentViewVisibleRect))
-        scrollPoint.x = CGRectGetMinX(rectInDocumentView);
-    else if (CGRectGetMaxX(rectInDocumentView) > CGRectGetMaxX(documentViewVisibleRect))
-        scrollPoint.x += CGRectGetMaxX(rectInDocumentView) - CGRectGetMaxX(documentViewVisibleRect);
+    if (rectInDocumentViewMinX < documentViewVisibleRectMinX && doesItFitForWidth)
+        // Scroll to left edge of aRect as it is to the left of the visible rect and it fit inside
+        scrollPoint.x = rectInDocumentViewMinX;
+    else if (CGRectGetMaxX(rectInDocumentView) > CGRectGetMaxX(documentViewVisibleRect) && doesItFitForWidth)
+        // Scroll to right edge of aRect as it is to the right of the visible rect and it fit inside
+        scrollPoint.x = CGRectGetMaxX(rectInDocumentView) - documentViewVisibleRect.size.width;
+    else if (rectInDocumentViewMinX > documentViewVisibleRectMinX)
+        // Scroll to left edge of aRect as it is to the right of the visible rect and it doesn't fit inside
+        scrollPoint.x = rectInDocumentViewMinX;
+    else if (CGRectGetMaxX(rectInDocumentView) < CGRectGetMaxX(documentViewVisibleRect))
+        // Scroll to right edge of aRect as it is to the left of the visible rect and it doesn't fit inside
+        scrollPoint.x = CGRectGetMaxX(rectInDocumentView) - documentViewVisibleRect.size.width;
 
-    if (CGRectGetMinY(rectInDocumentView) < CGRectGetMinY(documentViewVisibleRect))
-        scrollPoint.y = CGRectGetMinY(rectInDocumentView);
-    else if (CGRectGetMaxY(rectInDocumentView) > CGRectGetMaxY(documentViewVisibleRect))
-        scrollPoint.y += CGRectGetMaxY(rectInDocumentView) - CGRectGetMaxY(documentViewVisibleRect);
+    var rectInDocumentViewMinY = CGRectGetMinY(rectInDocumentView),
+        documentViewVisibleRectMinY = CGRectGetMinY(documentViewVisibleRect),
+        doesItFitForHeight = documentViewVisibleRect.size.height >= rectInDocumentView.size.height;
+
+    if (rectInDocumentViewMinY < documentViewVisibleRectMinY && doesItFitForHeight)
+        // Scroll to top edge of aRect as it is above the visible rect and it fit inside
+        scrollPoint.y = rectInDocumentViewMinY;
+    else if (CGRectGetMaxY(rectInDocumentView) > CGRectGetMaxY(documentViewVisibleRect) && doesItFitForHeight)
+        // Scroll to bottom edge of aRect as it is below the visible rect and it fit inside
+        scrollPoint.y = CGRectGetMaxY(rectInDocumentView) - documentViewVisibleRect.size.height;
+    else if (rectInDocumentViewMinY > documentViewVisibleRectMinY)
+        // Scroll to top edge of aRect as it is below the visible rect and it doesn't fit inside
+        scrollPoint.y = rectInDocumentViewMinY;
+    else if (CGRectGetMaxY(rectInDocumentView) < CGRectGetMaxY(documentViewVisibleRect))
+        // Scroll to bottom edge of aRect as it is above the visible rect and it doesn't fit inside
+        scrollPoint.y = CGRectGetMaxY(rectInDocumentView) - documentViewVisibleRect.size.height;
+
+    // Don't scroll if aRect contains the whole visible rect as it is already as visible as possible.
+    // We check this by comparing to new scrollPoint to the current.
+    if (CGPointEqualToPoint(scrollPoint, currentScrollPoint))
+        return NO;
 
     [enclosingClipView scrollToPoint:scrollPoint];
 
@@ -3555,7 +3592,6 @@ var CPViewAutoresizingMaskKey       = @"CPViewAutoresizingMask",
 
         _hitTests = ![aCoder containsValueForKey:CPViewHitTestsKey] || [aCoder decodeBoolForKey:CPViewHitTestsKey];
 
-        [self _setupToolTipHandlers];
         _toolTip = [aCoder decodeObjectForKey:CPViewToolTipKey];
 
         if (_toolTip)
