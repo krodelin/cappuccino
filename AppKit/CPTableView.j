@@ -2100,26 +2100,26 @@ NOT YET IMPLEMENTED
             found = NO,
             max_rec = 100;
 
-            while (max_rec--)
+        while (max_rec--)
+        {
+            if (!cellView || cellView === contentView)
             {
-                if (!cellView || cellView === contentView)
+                found = NO;
+                break;
+            }
+            else
+            {
+                var superview = [cellView superview];
+
+                if ([superview isKindOfClass:[CPTableView class]])
                 {
-                    found = NO;
+                    found = YES;
                     break;
                 }
-                else
-                {
-                    var superview = [cellView superview];
 
-                    if ([superview isKindOfClass:[CPTableView class]])
-                    {
-                        found = YES;
-                        break;
-                    }
-
-                    cellView = superview;
-                }
+                cellView = superview;
             }
+        }
 
         if (found)
         {
@@ -3593,6 +3593,9 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
         [self setNeedsDisplay:YES];
     }
 
+    if (!_isViewBased)
+        [self _setEditingState:NO forView:dataView];
+
     [self _sendDelegateWillDisplayView:dataView forTableColumn:tableColumn row:row];
 
     return dataView;
@@ -3646,7 +3649,7 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
     var view = nil;
 
     if (_viewForTableColumnRowSelector)
-        view = objj_msgSend(self, _viewForTableColumnRowSelector, aTableColumn, aRow);
+        view = self.isa.objj_msgSend2(self, _viewForTableColumnRowSelector, aTableColumn, aRow);
 
     if (!view)
     {
@@ -4208,7 +4211,7 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
     while (count--)
     {
         var currentIndex = indexes[count],
-            rowRect = CGRectIntersection(objj_msgSend(self, rectSelector, currentIndex), aRect);
+            rowRect = CGRectIntersection(self.isa.objj_msgSend1(self, rectSelector, currentIndex), aRect);
 
         // group rows get the same highlight style as other rows if they're source list...
         if (!drawGradient)
@@ -4282,7 +4285,7 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
 
     for (var i = 0; i < count2; i++)
     {
-         var rect = objj_msgSend(self, rectSelector, indexes[i]),
+         var rect = self.isa.objj_msgSend1(self, rectSelector, indexes[i]),
              minX = CGRectGetMinX(rect) - 0.5,
              maxX = CGRectGetMaxX(rect) - 0.5,
              minY = CGRectGetMinY(rect) - 0.5,
@@ -5091,7 +5094,7 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
         _editingColumn = column;
         _editingRow = row;
 
-        [aView addObserver:self forKeyPath:@"objectValue" options:CPKeyValueObservingOptionOld|CPKeyValueObservingOptionNew context:"editing"];
+        [aView addObserver:self forKeyPath:@"objectValue" options:CPKeyValueObservingOptionOld | CPKeyValueObservingOptionNew context:"editing"];
     }
 
     return aView;
@@ -5196,7 +5199,7 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
         [self _notifyViewDidBecomeFirstResponder];
 
     // This is for cell-based tables only. In view-based mode, we do not change the textfield apprearence during an edit.
-    if (!_isViewBased && _editingRow !== CPNotFound && [responder isKindOfClass:[CPTextField class]] && [responder isEditable])
+    if (!_isViewBased && _editingRow !== CPNotFound && [responder isKindOfClass:[CPTextField class]] && [responder isEditable] && [responder superview] == self)
     {
         [responder setBezeled:YES];
         [self _registerForEndEditingNote:responder];
@@ -6301,17 +6304,17 @@ var CPTableViewDataSourceKey                = @"CPTableViewDataSourceKey",
 
     var showCallback = function()
     {
-        objj_msgSend(self, "setHidden:", NO)
+        [self setHidden: NO];
         isBlinking = NO;
     };
 
     var hideCallback = function()
     {
-        objj_msgSend(self, "setHidden:", YES)
+        [self setHidden: YES];
         isBlinking = YES;
     };
 
-    objj_msgSend(self, "setHidden:", YES);
+    [self setHidden: YES];
     [CPTimer scheduledTimerWithTimeInterval:0.1 callback:showCallback repeats:NO];
     [CPTimer scheduledTimerWithTimeInterval:0.19 callback:hideCallback repeats:NO];
     [CPTimer scheduledTimerWithTimeInterval:0.27 callback:showCallback repeats:NO];
@@ -6391,6 +6394,7 @@ var CPTableViewDataSourceKey                = @"CPTableViewDataSourceKey",
 
 - (void)awakeFromCib
 {
+    [super awakeFromCib];
     [self setThemeState:CPThemeStateTableDataView];
 }
 
